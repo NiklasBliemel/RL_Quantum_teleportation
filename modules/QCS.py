@@ -27,11 +27,14 @@ class Operands:
 class Gate:
     def __init__(self, gate, target):
 
-        assert len(target) == len(gate), "taget indices dont match chosen gate!"
+        assert len(target) == len(gate), f"taget indices dont match chosen gate! (gate: {gate} target: {target}"
 
         if gate[0] == "M":
             self.measure = True
-            self.gate = Operands.gate_dic[gate[-1]]
+            if len(target) == 2:
+                self.gate = Operands.gate_dic[gate[-1]]
+            if len(target) == 1:
+                self.gate = None
         else:
             self.measure = False
             self.gate = Operands.gate_dic[gate]
@@ -42,21 +45,25 @@ class Gate:
 
     def __call__(self, psi):
         if not self.measure:
-            return Functions.contraction(psi, self.gate, self.target)
+            return Functions.contraction(psi, self.gate, self.target), 0
             
-        else:
-            mdim, tdim = self.target
-            axis = []
-            for i in range(len(psi.shape)):
-                if i != mdim:
-                    axis.append(i)
-            probability = torch.sum(torch.abs(psi) ** 2, axis=axis)
-            state = random.choices([Functions.zero, Functions.one], probability.tolist())[0]
-            out = Functions.contraction(psi, torch.outer(state,state), [mdim])
-            out /= torch.norm(out)
-            if int(state[1]) == 1:
-                return Functions.contraction(out, self.gate, [tdim])
-            return out
+        mdim = self.target[0]
+        axis = []
+        for i in range(len(psi.shape)):
+            if i != mdim:
+                axis.append(i)
+        probability = torch.sum(torch.abs(psi) ** 2, axis=axis)
+        state = random.choices([Functions.zero, Functions.one], probability.tolist())[0]
+        out = Functions.contraction(psi, torch.outer(state,state), [mdim])
+        out /= torch.norm(out)
+        
+        if len(self.target) == 1:
+            return out, torch.real(state[1]).int()
+            
+        if int(state[1]) == 1:
+            return Functions.contraction(out, self.gate, [self.target[1]]), 0
+        return out, 0
+        
 
     def __str__(self):
         if len(self.target) == 1:

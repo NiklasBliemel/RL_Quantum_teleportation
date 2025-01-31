@@ -36,22 +36,28 @@ class Tile:
 
 
 class SemiGradSarsa:
-    def __init__(self, env, q_net, max_steps = 1000, eps = 0.1, gamma = 1., alpha = 0.1):
-        self.env = env
-        self.q_net = q_net
-        self.max_steps = max_steps
+    def __init__(self, eps = 0.1, gamma = 1., alpha = 0.1):
         self.eps = eps 
         self.gamma = gamma
         self.alpha = alpha
         self.log = []
 
-    def update_weights(self, scale):
-        for w in self.q_net.parameters():
+    def get_log(self):
+        return self.log
+
+    def set_log(self, log=None):
+        if log is None:
+            self.log = []
+        else:
+            self.log = log
+
+    def update_weights(self, scale, q_net):
+        for w in q_net.parameters():
             with torch.no_grad():
                 w += scale * w.grad
 
     def eps_greedy(self, eps, q_values):
-        if random.random() < eps or torch.std(q_values) == 0:
+        if random.random() < eps or torch.abs(torch.std(q_values)) < 1e-9:
             A = random.randint(0, len(q_values) - 1)
             return A
         else:
@@ -64,35 +70,35 @@ class SemiGradSarsa:
         # plt.yscale("log")
         plt.show()
 
-    def run(self, max_episode):
+    def run(self, env, q_net, max_episode, max_steps):
         try:
             for ep in range(max_episode):
-                S = self.env.setup()
-                q_values = self.q_net(S)
+                S = env.setup()
+                q_values = q_net(S)
                 A = self.eps_greedy(self.eps, q_values)
-                self.q_net.zero_grad()
+                q_net.zero_grad()
                 q_values[A].backward()
-                for step in range(self.max_steps):
+                for step in range(max_steps):
                     
-                    S_new, R, goal_reached = self.env.step(S, A)
+                    S_new, R, goal_reached = env.step(S, A)
                     
                     if goal_reached:
                         scale = self.alpha * (R - q_values[A])
-                        self.update_weights(scale)
+                        self.update_weights(scale, q_net)
                         break
             
-                    q_values_new = self.q_net(S_new)
+                    q_values_new = q_net(S_new)
                     A_new = self.eps_greedy(self.eps, q_values_new)
                     scale = self.alpha * (R + self.gamma * q_values_new[A_new] - q_values[A])
-                    self.update_weights(scale)
+                    self.update_weights(scale, q_net)
         
                     A = A_new
                     if isinstance(S, torch.Tensor):
                         S = S_new.detach().clone()
                     else:
                         S = S_new * 1
-                    self.q_net.zero_grad()
-                    q_values = self.q_net(S)
+                    q_net.zero_grad()
+                    q_values = q_net(S)
                     q_values[A].backward()
                     
                 self.log.append(step+1)
