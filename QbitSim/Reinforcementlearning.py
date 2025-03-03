@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 
 class SemiGradSarsa:
-    def __init__(self, eps=0.1, gamma=1., alpha=0.1):
+    def __init__(self, eps=0.1, gamma=0.9, alpha=0.1):
         self.eps = eps
         self.gamma = gamma
         self.alpha = alpha
@@ -50,7 +50,6 @@ class SemiGradSarsa:
             plt.ylim(plot_range)
         plt.xlabel("Episodes")
         plt.ylabel("Steps")
-        # plt.yscale("log")
         plt.show()
 
     def run(self, env, q_net, max_episode, max_steps, catch_wins=False, catch_all=False, plot_range=None):
