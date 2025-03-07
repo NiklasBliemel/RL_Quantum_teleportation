@@ -11,10 +11,10 @@ class SemiGradSarsa:
         self.alpha = alpha
         self.log = []
 
-    def setting(self, eps=0.1, gamma=1., alpha=0.1):
-        self.eps = eps
-        self.gamma = gamma
-        self.alpha = alpha
+    def setting(self, eps=None, gamma=None, alpha=None):
+        self.eps = eps if eps is not None else self.eps
+        self.gamma = gamma if gamma is not None else self.gamma
+        self.alpha = alpha if alpha is not None else self.alpha
 
     def get_log(self):
         return self.log
@@ -52,13 +52,15 @@ class SemiGradSarsa:
         plt.ylabel("Steps")
         plt.show()
 
-    def run(self, env, q_net, max_episode, max_steps, catch_wins=False, catch_all=False, plot_range=None):
-        wins = []
+    def run(self, env, q_net, max_episode, max_steps, plot_range=None):
+        info_log = []
         try:
             for ep in range(max_episode):
-                action_log = []
+                ep_log = {"episode": ep, "win": False, "steps": []}
 
                 S, info = env.reset()
+                ep_log["reset"] = info
+
                 q_values = q_net(S)
                 A = self.eps_greedy(self.eps, q_values)
                 q_net.zero_grad()
@@ -66,13 +68,10 @@ class SemiGradSarsa:
                 for step in range(max_steps):
 
                     S_new, R, goal_reached, trunc, info = env.step(A)
+                    ep_log["steps"].append(info)
 
-                    action_log.append(info)
-
-                    if goal_reached:
-                        if catch_wins and not catch_all:
-                            wins.append(action_log)
-
+                    if goal_reached or trunc:
+                        ep_log["win"] = goal_reached
                         scale = self.alpha * (R - q_values[A])
                         self.update_weights(scale, q_net)
                         break
@@ -97,11 +96,11 @@ class SemiGradSarsa:
                 if ep % 10 == 0:
                     clear_output(wait=True)
                     self.plot_log(plot_range=plot_range)
-                if catch_all:
-                    wins.append(action_log)
+
+                info_log.append(ep_log)
+
         except KeyboardInterrupt:
             clear_output(wait=True)
             self.plot_log(plot_range=plot_range)
 
-        if catch_wins or catch_all:
-            return wins
+        return info_log

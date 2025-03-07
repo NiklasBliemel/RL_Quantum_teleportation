@@ -30,7 +30,4 @@ class Gate:
                     return out, m
 
     def __str__(self):
-        if len(self.target) == 1:
-            return f"{self.gate}->{str(self.target)}"
-        if len(self.target) == 2:
-            return f"{self.gate[0]}[{self.target[0]}]->{self.gate[1]}[{self.target[1]}]"
+        return f"{self.gate}->{str(self.target)}"

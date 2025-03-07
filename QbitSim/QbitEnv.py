@@ -15,10 +15,11 @@ class QbitEnv(gym.Env):
                      Gate("CX", [2, 1]), Gate("H", [2]),
                      Gate("MX", [1, 0]), Gate("MZ", [2, 0])]
 
-    def __init__(self, N_qbits, allowed_gates, max_steps, starting_aid=2):
+    def __init__(self, N_qbits, allowed_gates, max_steps, starting_aid=2,
+                 single_rule=None, double_rule=None, measure_rule=None):
         super(QbitEnv, self).__init__()
 
-        self.actions = GateList(N_qbits, allowed_gates)
+        self.actions = GateList(N_qbits, allowed_gates, single_rule, double_rule, measure_rule)
         self.max_steps = max_steps
         self.start = QbitEnv.full_solution[:starting_aid]
         self.solution = QbitEnv.full_solution[starting_aid:]
@@ -42,19 +43,27 @@ class QbitEnv(gym.Env):
 
     def step(self, action):
         info = {"Step": self.cur_step}
+
         if self.cur_step + 1 == self.max_steps:
             info["M"] = None
-            return self.feature_vector, -1, bool(self._terminal_check()), True, info
+            return self.feature_vector, -10, False, True, info
+
         self.current_state, m = self.actions[action](self.current_state)
-        info["M"] = m
+        terminal = bool(self._terminal_check())
+
+        info["M"] = int(m) if m is not None else None
         info["Action"] = str(self.actions[action])
+        info["Terminal"] = terminal
+
         if m is None:
             m = 2
+
         self.feature_vector = self.feature_vector.reshape(self.shape)
         self.feature_vector[self.cur_step, (m * len(self.actions) + action)] = 1
         self.feature_vector = self.feature_vector.flatten()
+
         self.cur_step += 1
-        return self.feature_vector.numpy(), -1, bool(self._terminal_check()), False, info
+        return self.feature_vector.numpy(), -1, terminal, False, info
 
     def reset(self, seed=None, options=None):
         if options is not None:
@@ -64,7 +73,7 @@ class QbitEnv(gym.Env):
         for gate in self.start:
             self.current_state = gate(self.current_state)[0]
         self.cur_step = 0
-        return self.feature_vector.numpy(), {"Step": self.cur_step, "M": None}
+        return self.feature_vector.numpy(), {}
 
     def render(self):
         out = ""
@@ -109,6 +118,21 @@ class QbitEnv(gym.Env):
         except KeyboardInterrupt:
             clear_output()
 
+    def qval_test(self, qnet, steps=1):
+        S, info = self.reset()
+        for i in range(steps):
+            q_vals = qnet(self.feature_vector)
+            print(f"qval {i}:\n{q_vals}\n\n")
+            if torch.abs(torch.std(q_vals)) < QbitEnv.tol:
+                A = random.randint(0, len(self.actions) - 1)
+            else:
+                A = torch.argmax(q_vals)
+            S, R, terminal, trunc, info = self.step(A)
+            if terminal:
+                print(f"\nGoal in {i + 1} steps!")
+                break
+        S, info = self.reset()
+
     def get_feature_length(self):
         return len(self.feature_vector)
 
@@ -117,3 +141,10 @@ class QbitEnv(gym.Env):
 
     def print_actions(self):
         print(self.actions)
+
+    def get_cnot_index(self):
+        out = []
+        for i, a in enumerate(self.actions):
+            if str(a)[:2] == "CX":
+                out.append(i)
+        return out

@@ -4,15 +4,16 @@ from QbitSim.Gate import Gate
 
 class GateList:
 
-    single_rule = lambda i: True
-    double_rule = lambda i,j: abs(i-j) == 1 and 0 not in [i, j]
-    measure_rule = lambda i: i != 0
+    def __init__(self, N_qbits, allowed_gates="X Y Z H M CX CZ MX MY MZ",
+                 single_rule=None, double_rule=None, measure_rule=None):
 
-    def __init__(self, N_qbits, allowed_gates="X Y Z H M CX CZ MX MY MZ"):
+        self.single_rule = single_rule if single_rule is not None else lambda i: True
+        self.double_rule = double_rule if double_rule is not None else lambda i, j: abs(i - j) == 1
+        self.measure_rule = measure_rule if measure_rule is not None else lambda i: True
 
-        singlegate_targets = [[i] for i in range(N_qbits) if GateList.single_rule(i)]
-        doublegate_targets = [[i, j] for i in range(N_qbits) for j in range(N_qbits) if GateList.double_rule(i, j)]
-        measure_targets = [[i] for i in range(N_qbits) if GateList.measure_rule(i)]
+        singlegate_targets = [[i] for i in range(N_qbits) if self.single_rule(i)]
+        doublegate_targets = [[i, j] for i in range(N_qbits) for j in range(N_qbits) if self.double_rule(i, j)]
+        measure_targets = [[i] for i in range(N_qbits) if self.measure_rule(i)]
 
         self.actions = []
 
