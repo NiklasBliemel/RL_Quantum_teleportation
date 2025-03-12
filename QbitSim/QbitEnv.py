@@ -10,100 +10,108 @@ from QbitSim.utils import new_q_bits, infidality
 
 
 class QbitEnv(gym.Env):
-    tol = 1e-9
-    full_solution = [Gate("H", [1]), Gate("CX", [1, 0]),
-                     Gate("CX", [2, 1]), Gate("H", [2]),
-                     Gate("MX", [1, 0]), Gate("MZ", [2, 0])]
+    metadata = {'render.modes': ['human']}
 
-    def __init__(self, N_qbits, allowed_gates, max_steps, starting_aid=2,
-                 single_rule=None, double_rule=None, measure_rule=None):
+    tol = 1e-9
+    bell_state = [Gate("H", [1]), Gate("CX", [1, 0])]
+
+    def __init__(self, N_qbits, allowed_gates, max_steps, action_repetition=1, max_cnots=2,
+                 starting_aid=False, single_rule=None, double_rule=None, measure_rule=None):
         super(QbitEnv, self).__init__()
 
         self.actions = GateList(N_qbits, allowed_gates, single_rule, double_rule, measure_rule)
-        self.max_steps = max_steps
-        self.start = QbitEnv.full_solution[:starting_aid]
-        self.solution = QbitEnv.full_solution[starting_aid:]
-        self.shape = (max_steps, 3 * len(self.actions))
-        self.cur_step = 0
-        self.current_state, self.random_state = new_q_bits(L=3)
-        self.feature_vector = torch.zeros(self.shape, dtype=torch.float64).flatten()
-        for gate in self.start:
-            self.current_state = gate(self.current_state)[0]
-
+        self.action_counter = torch.zeros(len(self.actions))
+        self.action_repetition = action_repetition
+        self.action_mask = torch.zeros(len(self.actions), dtype=torch.float64)
         self.action_space = spaces.Discrete(len(self.actions))
-        low = torch.full_like(self.feature_vector, 0.)  # Min value for each element
-        high = torch.full_like(self.feature_vector, 1.)  # Max value for each element
-        self.observation_space = spaces.Box(low=low.numpy(), high=high.numpy(), dtype=np.float64)
 
-    def _terminal_check(self, inspect=False):
-        infi = infidality(self.current_state, self.random_state)
-        if inspect:
-            print(f"Infidelity: {infi:.5e}")
-        return infi < QbitEnv.tol
+        self.state = -torch.ones(max_steps, dtype=torch.int32)
+        low = torch.full_like(self.state, -1)
+        high = torch.full_like(self.state, 3 * len(self.actions))
+        self.observation_space = spaces.Box(low=low.numpy(), high=high.numpy(), dtype=np.int32)
+
+        self.N_qbits = N_qbits
+        self.starting_aid = starting_aid
+        self.cur_step = 0
+        self.max_steps = max_steps
+        self.cnot_counter = 0
+        self.max_cnots = max_cnots
+
+        self.psi, self.random_state = new_q_bits(L=3)
+        if starting_aid:
+            for gate in QbitEnv.bell_state:
+                self.psi = gate(self.psi)[0]
+
+    def reset(self, seed=None, options=None):
+        if options is not None:
+            torch.random.manual_seed(seed)
+
+        self.psi, self.random_state = new_q_bits(L=self.N_qbits)
+        if self.starting_aid:
+            for gate in QbitEnv.bell_state:
+                self.psi = gate(self.psi)[0]
+
+        self.state[:] = -1
+        self.cur_step = 0
+        self.cnot_counter = 0
+        self.action_counter[:] = 0.
+        self.action_mask[:] = 0.
+        return self.state.numpy(), {}
 
     def step(self, action):
         info = {"Step": self.cur_step}
 
         if self.cur_step + 1 == self.max_steps:
             info["M"] = None
-            return self.feature_vector, -10, False, True, info
+            return self.state, -10, True, False, info
 
-        self.current_state, m = self.actions[action](self.current_state)
+        if str(self.actions[action])[:2] == "CX":
+            if not self.out_of_cnots():
+                self.cnot_counter += 1
+                if self.out_of_cnots():
+                    self.action_mask[self.get_cnot_index()] = -torch.inf
+
+        if self.action_counter[action] < self.action_repetition:
+            self.action_counter[action] += 1
+            if self.action_counter[action] >= self.action_repetition:
+                self.action_mask[action] = -torch.inf
+
+        self.psi, m = self.actions[action](self.psi)
+
         terminal = bool(self._terminal_check())
-
         info["M"] = int(m) if m is not None else None
         info["Action"] = str(self.actions[action])
         info["Terminal"] = terminal
 
-        if m is None:
-            m = 2
-
-        self.feature_vector = self.feature_vector.reshape(self.shape)
-        self.feature_vector[self.cur_step, (m * len(self.actions) + action)] = 1
-        self.feature_vector = self.feature_vector.flatten()
+        m = 2 if m is None else m
+        self.state[self.cur_step] = m * len(self.actions) + action
 
         self.cur_step += 1
-        return self.feature_vector.numpy(), -1, terminal, False, info
+        return self.state.numpy(), -1, terminal, False, info
 
-    def reset(self, seed=None, options=None):
-        if options is not None:
-            torch.random.manual_seed(seed)
-        self.current_state, self.random_state = new_q_bits(L=3)
-        self.feature_vector = torch.zeros(self.shape).flatten()
-        for gate in self.start:
-            self.current_state = gate(self.current_state)[0]
-        self.cur_step = 0
-        return self.feature_vector.numpy(), {}
+    def render(self, mode='human'):
+        for action in self.state:
+            if action != -1:
+                gate = str(self.actions[action % len(self.actions)])
+                m = action // len(self.actions)
+                print(f"Gate: {gate}, M = {m}")
 
-    def render(self):
-        out = ""
-        S = self.feature_vector.reshape(self.shape)
-        S = S.argmax(axis=-1)
-        t = S // len(self.actions)
-        m = S % len(self.actions)
-        m[m == 2] = None
-        for i in range(0, self.cur_step):
-            out += f"{i}th Action: ({str(self.actions[t[i]])} \t measure: {m[i]})\n"
-        print(out)
+    def get_action_mask(self):
+        return self.action_mask
 
-    def test_solution(self, inspect=False):
-        obs, info = self.reset()
-        for gate in self.solution:
-            self.current_state, m = gate(self.current_state)
-            print(f"Gate: {gate}, m = {m}") if inspect else None
-        print("Solution True!") if self._terminal_check(inspect) else print("Solution False!")
-        obs, info = self.reset()
+    def _terminal_check(self, inspect=False):
+        infi = infidality(self.psi, self.random_state)
+        if inspect:
+            print(f"Infidelity: {infi:.5e}")
+        return infi < QbitEnv.tol
 
     def test_net(self, qnet):
         try:
             obs, info = self.reset()
             goal_reached = False
             for i in range(self.max_steps):
-                q_values = qnet(self.feature_vector)
-                if torch.abs(torch.std(q_values)) < QbitEnv.tol:
-                    A = random.randint(0, len(self.actions) - 1)
-                else:
-                    A = torch.argmax(q_values)
+                q_values = qnet(self.state)
+                A = torch.argmax(q_values + self.action_mask)
                 obs, R, goal_reached, truncated, info = self.step(A)
                 if str(self.actions[A])[0] == "M" and len(self.actions[A].target) == 1:
                     print(f"{self.actions[A]}\tm = {info["M"]}")
@@ -121,23 +129,20 @@ class QbitEnv(gym.Env):
     def qval_test(self, qnet, steps=1):
         S, info = self.reset()
         for i in range(steps):
-            q_vals = qnet(self.feature_vector)
-            print(f"qval {i}:\n{q_vals}\n\n")
-            if torch.abs(torch.std(q_vals)) < QbitEnv.tol:
-                A = random.randint(0, len(self.actions) - 1)
-            else:
-                A = torch.argmax(q_vals)
+            q_vals = qnet(self.state)
+            A = torch.argmax(q_vals + self.action_mask)
+            print(f"\nQ-vals {i}:")
+            for j, q_val in enumerate(q_vals + self.action_mask):
+                gate = str(self.actions[j])
+                if j != A:
+                    print(f"{gate}:\t\t {q_val}") if len(gate) < 10 else print(f"{gate}:\t {q_val}")
+                else:
+                    print(f"{gate}:\t\t {q_val} <---") if len(gate) < 10 else print(f"{gate}:\t {q_val} <---")
             S, R, terminal, trunc, info = self.step(A)
             if terminal:
                 print(f"\nGoal in {i + 1} steps!")
                 break
         S, info = self.reset()
-
-    def get_feature_length(self):
-        return len(self.feature_vector)
-
-    def get_action_length(self):
-        return len(self.actions)
 
     def print_actions(self):
         print(self.actions)
@@ -148,3 +153,6 @@ class QbitEnv(gym.Env):
             if str(a)[:2] == "CX":
                 out.append(i)
         return out
+
+    def out_of_cnots(self):
+        return self.cnot_counter >= self.max_cnots

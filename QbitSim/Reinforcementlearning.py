@@ -11,20 +11,6 @@ class SemiGradSarsa:
         self.alpha = alpha
         self.log = []
 
-    def setting(self, eps=None, gamma=None, alpha=None):
-        self.eps = eps if eps is not None else self.eps
-        self.gamma = gamma if gamma is not None else self.gamma
-        self.alpha = alpha if alpha is not None else self.alpha
-
-    def get_log(self):
-        return self.log
-
-    def set_log(self, log=None):
-        if log is None:
-            self.log = []
-        else:
-            self.log = log
-
     def update_weights(self, scale, q_net):
         for w in q_net.parameters():
             with torch.no_grad():
@@ -39,55 +25,39 @@ class SemiGradSarsa:
         else:
             return torch.argmax(q_values)
 
-    def plot_log(self, max_plot_length=1000, plot_range=None):
-        L = len(self.log)
-        if L < max_plot_length:
-            x_range = torch.arange(1, L + 1)
-        else:
-            x_range = torch.arange(L - max_plot_length + 1, L + 1)
-        plt.plot(x_range, self.log[-max_plot_length:])
-        if plot_range is not None:
-            plt.ylim(plot_range)
-        plt.xlabel("Episodes")
-        plt.ylabel("Steps")
-        plt.show()
-
     def run(self, env, q_net, max_episode, max_steps, plot_range=None):
         info_log = []
         try:
             for ep in range(max_episode):
-                ep_log = {"episode": ep, "win": False, "steps": []}
+                ep_log = {"episode": ep, "win": False, "actions": []}
 
                 S, info = env.reset()
                 ep_log["reset"] = info
 
                 q_values = q_net(S)
-                A = self.eps_greedy(self.eps, q_values)
+                A = self.eps_greedy(self.eps, q_values + env.get_action_mask())
                 q_net.zero_grad()
                 q_values[A].backward()
                 for step in range(max_steps):
 
                     S_new, R, goal_reached, trunc, info = env.step(A)
-                    ep_log["steps"].append(info)
+                    ep_log["actions"].append(info)
 
-                    if goal_reached or trunc:
+                    if goal_reached:
                         ep_log["win"] = goal_reached
                         scale = self.alpha * (R - q_values[A])
                         self.update_weights(scale, q_net)
                         break
 
                     q_values_new = q_net(S_new)
-                    A_new = self.eps_greedy(self.eps, q_values_new)
+                    A_new = self.eps_greedy(self.eps, q_values_new + env.get_action_mask())
                     scale = self.alpha * (R + self.gamma * q_values_new[A_new] - q_values[A])
                     self.update_weights(scale, q_net)
 
                     A = A_new
-                    
-                    if isinstance(S, torch.Tensor):
-                        S = S_new.clone().detach()
-                    else:
-                        S = S_new * 1
-                        
+
+                    S = S_new.clone().detach() if torch.is_tensor(S_new) else S_new * 1
+
                     q_net.zero_grad()
                     q_values = q_net(S)
                     q_values[A].backward()
@@ -97,6 +67,7 @@ class SemiGradSarsa:
                     clear_output(wait=True)
                     self.plot_log(plot_range=plot_range)
 
+                ep_log["steps"] = step + 1
                 info_log.append(ep_log)
 
         except KeyboardInterrupt:
@@ -104,3 +75,31 @@ class SemiGradSarsa:
             self.plot_log(plot_range=plot_range)
 
         return info_log
+
+    def plot_log(self, max_plot_length=1000, plot_range=None):
+        L = len(self.log)
+        if L < max_plot_length:
+            x_range = torch.arange(1, L + 1)
+        else:
+            x_range = torch.arange(L - max_plot_length + 1, L + 1)
+        plt.plot(x_range, self.log[-max_plot_length:])
+        if plot_range is not None:
+            plt.ylim(plot_range)
+        plt.grid(True)
+        plt.xlabel("Episodes")
+        plt.ylabel("Total Reward")
+        plt.show()
+
+    def setting(self, eps=None, gamma=None, alpha=None):
+        self.eps = eps if eps is not None else self.eps
+        self.gamma = gamma if gamma is not None else self.gamma
+        self.alpha = alpha if alpha is not None else self.alpha
+
+    def get_log(self):
+        return self.log
+
+    def set_log(self, log=None):
+        if log is None:
+            self.log = []
+        else:
+            self.log = log
