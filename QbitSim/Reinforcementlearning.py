@@ -5,6 +5,9 @@ import matplotlib.pyplot as plt
 
 
 class SemiGradSarsa:
+
+    M = -1.e8
+
     def __init__(self, eps=0.1, gamma=0.9, alpha=0.1):
         self.eps = eps
         self.gamma = gamma
@@ -18,8 +21,8 @@ class SemiGradSarsa:
                     w += scale * w.grad
 
     def eps_greedy(self, eps, q_values):
-        if random.random() < eps or torch.abs(torch.std(q_values[q_values != -torch.inf])) < 1e-9:
-            w_list = [0 if q_val == -torch.inf else 1 for q_val in q_values]
+        if random.random() < eps or torch.abs(torch.std(q_values[q_values > SemiGradSarsa.M])) < 1e-9:
+            w_list = [0 if q_val <= SemiGradSarsa.M else 1 for q_val in q_values]
             A = random.choices(list(range(len(q_values))), weights=w_list)[0]
             return A
         else:
@@ -35,22 +38,23 @@ class SemiGradSarsa:
                 ep_log["reset"] = info
 
                 q_values = q_net(S)
-                A = self.eps_greedy(self.eps, q_values + env.get_action_mask())
+                A = self.eps_greedy(self.eps, q_values)
                 q_net.zero_grad()
                 q_values[A].backward()
                 for step in range(max_steps):
 
                     S_new, R, goal_reached, trunc, info = env.step(A)
+                    action_mask = -(torch.tensor(env.action_masks()).int() - 1) * SemiGradSarsa.M
                     ep_log["actions"].append(info)
 
-                    if goal_reached:
+                    if goal_reached or trunc:
                         ep_log["win"] = goal_reached
                         scale = self.alpha * (R - q_values[A])
                         self.update_weights(scale, q_net)
                         break
 
                     q_values_new = q_net(S_new)
-                    A_new = self.eps_greedy(self.eps, q_values_new + env.get_action_mask())
+                    A_new = self.eps_greedy(self.eps, q_values_new + action_mask)
                     scale = self.alpha * (R + self.gamma * q_values_new[A_new] - q_values[A])
                     self.update_weights(scale, q_net)
 
@@ -87,7 +91,7 @@ class SemiGradSarsa:
             plt.ylim(plot_range)
         plt.grid(True)
         plt.xlabel("Episodes")
-        plt.ylabel("Total Reward")
+        plt.ylabel("Steps per episode")
         plt.show()
 
     def setting(self, eps=None, gamma=None, alpha=None):
