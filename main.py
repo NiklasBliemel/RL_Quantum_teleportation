@@ -18,4 +18,4 @@ if __name__ == '__main__':
 
     trainer = qsim.Trainer(env, reward_threshold, model_name, policy_kwargs=policy_kwargs)
 
-    trainer.train()
+    trainer.performance_test()

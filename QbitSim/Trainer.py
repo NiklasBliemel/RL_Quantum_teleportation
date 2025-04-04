@@ -3,6 +3,7 @@ from sb3_contrib.common.maskable.utils import get_action_masks
 from stable_baselines3.common.callbacks import EvalCallback, StopTrainingOnRewardThreshold
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
+from time import time_ns
 import os
 
 
@@ -29,6 +30,12 @@ class Trainer:
             self.model.learn(1e10, callback=self.eval_callback)
         except KeyboardInterrupt:
             self.model.learn(1000, callback=self.eval_callback)
+
+    def performance_test(self):
+        start = time_ns()
+        self.model.learn(5000, callback=self.eval_callback)
+        total = time_ns() - start
+        print(f"{total * 1e-6:.3f}ms")
 
     def set_reward_threshold(self, reward_threshold):
         self.callback_on_best = StopTrainingOnRewardThreshold(
