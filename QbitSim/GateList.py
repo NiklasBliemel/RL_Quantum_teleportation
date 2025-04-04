@@ -4,7 +4,7 @@ from QbitSim.Gate import Gate
 
 class GateList:
 
-    def __init__(self, N_qbits, allowed_gates="X Y Z H M CX CZ MX MY MZ",
+    def __init__(self, N_qbits, allowed_gates="X Z H M CX",
                  single_rule=None, double_rule=None, measure_rule=None):
 
         self.single_rule = single_rule if single_rule is not None else lambda i: True

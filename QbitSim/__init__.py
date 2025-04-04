@@ -1,5 +1,4 @@
 from .QbitEnv import QbitEnv
-from .Reinforcementlearning import SemiGradSarsa
-from .ActionModel import ActionModel
+from .Trainer import Trainer
 
-__all__ = ['QbitEnv', 'SemiGradSarsa', 'ActionModel']
+__all__ = ['QbitEnv', 'Trainer']

@@ -14,26 +14,24 @@ class QbitEnv(gym.Env):
 
     tol = 1e-9
 
-    def __init__(self, N_qbits, allowed_gates,
-                 max_steps, action_repetition=None, max_cnots=2,
-                 single_rule=None, double_rule=None, measure_rule=None):
+    def __init__(self, N_qbits, max_steps, max_cnots=2, fail_reward=-1):
         super(QbitEnv, self).__init__()
 
         self.N_qbits = N_qbits
-        self.actions = GateList(N_qbits, allowed_gates, single_rule, double_rule, measure_rule)
+        self.max_steps = max_steps
+        self.max_cnots = max_cnots
+        self.fail_reward = fail_reward
 
+        self.actions = GateList(N_qbits)
         self.action_space = spaces.Discrete(len(self.actions))
 
         self.observation_space = spaces.Box(low=-1, high=3 * len(self.actions), shape=[max_steps], dtype=np.int32)
-
         self.state = -torch.ones(max_steps, dtype=torch.int32)
         self._new_psi()
 
         self.action_counter = torch.zeros(len(self.actions))
-        self.action_repetition = action_repetition if action_repetition is not None else max_steps
 
         self.cnot_counter = 0
-        self.max_cnots = max_cnots if max_cnots is not None else max_steps
         self.cnot_indices = self._get_cnot_indices()
 
         self.cur_step = 0
@@ -58,7 +56,7 @@ class QbitEnv(gym.Env):
             info["M"] = None
             info["Action"] = "Step limit reached"
             info["Terminal"] = True
-            return self.state.flatten().numpy(), -5, False, True, info
+            return self.state.flatten().numpy(), self.fail_reward, False, True, info
 
         self._update_invalid_actions(action)
 
@@ -146,10 +144,8 @@ class QbitEnv(gym.Env):
                 if self.cnot_counter >= self.max_cnots:
                     self.invalid_actions += self.cnot_indices
 
-        if self.action_counter[action] < self.action_repetition:
-            self.action_counter[action] += 1
-            if self.action_counter[action] >= self.action_repetition:
-                self.invalid_actions.append(action)
+        if self.action_counter[action] < 1 and str(self.actions[action])[0] == "M":
+            self.invalid_actions.append(action)
 
     def _get_cnot_indices(self):
         out = []
