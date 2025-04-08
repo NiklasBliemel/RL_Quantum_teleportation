@@ -24,11 +24,9 @@ class QbitEnv(gym.Env):
         self.actions = GateList(N_qbits)
         self.action_space = spaces.Discrete(len(self.actions))
 
-        self.observation_space = spaces.Box(low=-1, high=3 * len(self.actions), shape=[max_steps], dtype=np.int32)
-        self.state = -torch.ones(max_steps, dtype=torch.int32)
+        self.observation_space = spaces.Box(low=-1, high=3 * len(self.actions), shape=[self.max_steps], dtype=np.int32)
+        self.state = -torch.ones(self.max_steps, dtype=torch.int32)
         self._new_psi()
-
-        self.action_counter = torch.zeros(len(self.actions))
 
         self.cnot_counter = 0
         self.cnot_indices = self._get_cnot_indices()
@@ -44,7 +42,6 @@ class QbitEnv(gym.Env):
         self.state[:] = -1
         self.cur_step = 0
         self.cnot_counter = 0
-        self.action_counter[:] = 0.
         self.invalid_actions: list[int] = []
         return self.state.flatten().numpy(), {}
 
@@ -103,9 +100,9 @@ class QbitEnv(gym.Env):
                 self.cnot_counter += 1
                 if self.cnot_counter >= self.max_cnots:
                     self.invalid_actions += self.cnot_indices
-
-        if self.action_counter[action] < 1 and str(self.actions[action])[0] == "M":
-            self.invalid_actions.append(action)
+        else:
+            if str(self.actions[action])[0] == "M":
+                self.invalid_actions.append(action)
 
     def _get_cnot_indices(self):
         out = []
