@@ -21,9 +21,9 @@ if __name__ == '__main__':
     model_repetition = 5
     model_sizes = [256, 512]
     default_model_size = 256
-    learning_rates = [0.0001, 0.0007, 0.001]
+    learning_rates = [0.0003, 0.001, 0.005, 0.01]
     default_learning_rate = 0.0003
-    ent_coefs = [0.001, 0.01, 0.1]
+    ent_coefs = [0, 0.001, 0.01, 0.1]
     default_ent_coef = 0.0
 
     best_convergence = 1e6
