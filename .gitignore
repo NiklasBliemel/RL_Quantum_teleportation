@@ -3,6 +3,7 @@
 *.out
 *.aux
 *.sh
+*.ipynb
 .ssh/
 .bash_history
 .config/
