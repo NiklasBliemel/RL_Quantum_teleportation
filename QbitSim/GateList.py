@@ -1,12 +1,22 @@
 from QbitSim.utils import new_q_bits
 from QbitSim.Gate import Gate
 
+'''''
+GateList constructs a list of gates, based on the given rules.
+It defines available actions for the qbit - environment.
+allowed gates contains all gate-types which should be used.
+single-/double-/measure_rule defines all possible target combinations for each gate type 
+(i.e. H X Z are single gates / C-gates are double gates / M is measure gate)
+    -> see default definitions for example
+'''''
+
 
 class GateList:
 
     def __init__(self, N_qbits, allowed_gates="H X Z M CX",
                  single_rule=None, double_rule=None, measure_rule=None):
 
+        # default definitions
         self.single_rule = single_rule if single_rule is not None else lambda i: True
         self.double_rule = double_rule if double_rule is not None else lambda i, j: abs(i - j) == 1
         self.measure_rule = measure_rule if measure_rule is not None else lambda i: True
@@ -52,6 +62,7 @@ class GateList:
     def append(self, gate):
         self.actions.append(gate)
 
+    # calls every action to make sure everything works
     def _check(self, N_qbits):
         psi, random_state = new_q_bits(N_qbits)
         for action in self.actions:

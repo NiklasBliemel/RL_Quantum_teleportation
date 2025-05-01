@@ -25,6 +25,7 @@ class Trainer:
         )
 
     def load_model(self, model_name):
+        self.reset_callback()
         if model_name in os.listdir("models"):
             self.model = MaskablePPO.load(os.path.join("models", model_name, "best_model"), env=self.env)
             self.model.verbose = 0
@@ -40,26 +41,27 @@ class Trainer:
                 var = "y"
             else:
                 var = input("Model already exists, do you want to overwrite it? (y/n): ")
-            if var == "y":
-                self.model = MaskablePPO("MlpPolicy", self.env, learning_rate=learning_rate, ent_coef=ent_coef,
-                                         policy_kwargs=policy_kwargs, verbose=verbose)
-                self.eval_callback.best_model_save_path = os.path.join("models", model_name)
-                self.eval_callback.log_path = os.path.join("logs", model_name)
-                self.model.save(os.path.join("models", model_name, "best_model"))
-                print(f"{model_name} initialized!")
-            elif var == "n":
+
+            if var == "n":
                 self.load_model(model_name)
-            else:
-                self.new_model(model_name, policy_kwargs=policy_kwargs)
-                self.model.verbose = verbose
-        else:
-            self.model = MaskablePPO("MlpPolicy", self.env, learning_rate=learning_rate, ent_coef=ent_coef,
-                                     policy_kwargs=policy_kwargs, verbose=verbose)
-            self.eval_callback.best_model_save_path = os.path.join("models", model_name)
-            self.eval_callback.log_path = os.path.join("logs", model_name)
-            os.mkdir(f"models/{model_name}")
-            self.model.save(os.path.join("models", model_name, "best_model"))
-            print(f"{model_name} initialized!")
+                return
+        self.reset_callback()
+        self.model = MaskablePPO("MlpPolicy", self.env, learning_rate=learning_rate, ent_coef=ent_coef,
+                                 policy_kwargs=policy_kwargs, verbose=verbose)
+        self.eval_callback.best_model_save_path = os.path.join("models", model_name)
+        self.eval_callback.log_path = os.path.join("logs", model_name)
+        os.mkdir(f"models/{model_name}")
+        self.model.save(os.path.join("models", model_name, "best_model"))
+        print(f"{model_name} initialized!")
+
+    def reset_callback(self):
+        self.eval_callback = MaskableEvalCallback(
+            self.env,
+            n_eval_episodes=20,
+            eval_freq=5000,
+            callback_on_new_best=self.callback_on_best,
+            verbose=1
+        )
 
     def train(self):
         assert self.model is not None, "Model does not exist"

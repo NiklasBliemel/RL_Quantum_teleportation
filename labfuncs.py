@@ -11,6 +11,7 @@ max_cnots = 2
 
 env = qsim.QbitEnv(N_qbits=N_qbits, max_steps=max_steps, fail_reward=fail_reward, max_cnots=max_cnots)
 
+
 def test(modelname):
     path = f"models/{modelname}/best_model.zip"
     test_model = MaskablePPO.load(path)
@@ -27,16 +28,19 @@ def test(modelname):
     if not terminated:
         print("Failure!")
 
+
 def last_timestep(modelname):
     path = f"logs/{modelname}"
     if path[-4:] != ".npz":
         path += ".npz"
     log = np.load(path)
-    print(f"{log['timesteps'][-1]:.2e}")
+    return log['timesteps'][-1]
+
 
 def best_val(modelname):
     path = f"logs/{modelname}"
     if path[-4:] != ".npz":
         path += ".npz"
     log = np.load(path)
-    print(f"{np.max(log['results'][-1])}")
+    return np.max(log['results'][-1])
+    

@@ -1,5 +1,12 @@
 from QbitSim.utils import pauliX, pauliY, pauliZ, hamada, controlX, controlZ, contraction, measure
 
+'''''
+Gates are defines by defining the gate-Type and the qbit(s), which it targets.
+Type is chosen by giving corresponding string (e.g. "M" is measure gate)
+target should be a list containing the index of targeted qbit(s)
+(for control gates; first index corresponds to the control qbit)
+'''''
+
 
 class Gate:
 

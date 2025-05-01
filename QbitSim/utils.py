@@ -1,7 +1,10 @@
 import random
-
 import numpy as np
 import torch
+
+'''''
+All the gate Tensors and core Quantum computing functionality is defined here.
+'''''
 
 dtype = torch.complex128
 zero = torch.tensor([1, 0], dtype=dtype)
@@ -19,14 +22,17 @@ controlZ[0, :, 0] = pauliI
 controlZ[1, :, 1] = pauliZ
 
 
+# returns a random single Qbit state connected with zero Qbits up to a total of L Qbits; also returns copy of the random_state
 def new_q_bits(L):
     random_state = torch.randn(2, dtype=dtype)
     random_state /= torch.norm(random_state)
     out = torch.zeros([2 for _ in range(L)], dtype=torch.complex128)
-    out[0, 0, :] = random_state.clone().detach()
+    index = [0 for _ in range(L-1)]
+    out[*index, :] = random_state.clone().detach()
     return out, random_state
 
 
+# requires either list with one dimension to contract over rank 2 gate or list with two for rank 4 gate contraction
 def contraction(psi, gate, dims):
     rank = len(psi.shape)
     permute_list = []
@@ -58,6 +64,7 @@ def contraction(psi, gate, dims):
     raise ValueError("contraction indices must be a list of length 1 or 2")
 
 
+# returns infidality of given single Qbit random_state and current wave-function psi
 def infidality(psi, rand_state):
     p = torch.tensordot(torch.conj(psi), psi, dims=[[1, 2], [1, 2]])
     q = torch.conj(rand_state).unsqueeze(-1) * rand_state.unsqueeze(0)
@@ -65,6 +72,8 @@ def infidality(psi, rand_state):
     return torch.abs(trace - 1)
 
 
+# chooses random 0 or 1 based on Qbit in dimension 'dim' and collapses wave function according to the result
+# also returns the measurement
 def measure(psi, dim):
     probability = torch.sum(torch.abs(psi) ** 2, axis=[i for i in range(len(psi.shape)) if i != dim[0]])
     state = random.choices([zero.clone().detach(), one.clone().detach()], probability.tolist())[0]

@@ -7,19 +7,35 @@ from QbitSim.Gate import Gate
 from QbitSim.GateList import GateList
 from QbitSim.utils import new_q_bits, infidality
 
+'''''
+Main part of the project:
+QbitEnv defines simulates a Quantum Computer with N qbits.
+It also defines all rules for the training process e.g.:
+    - staring conditions
+    - goal state
+    - rewards
+    - form of observations
+    - max number of actions before reset
+
+It was built to work as Environment for MaskablePPO algorithm, which has the ability to
+rule out available actions. E.g. this is used to limit how many CX gates are allowed to
+be used in one run.
+https://sb3-contrib.readthedocs.io/en/master/modules/ppo_mask.html# for further details.
+'''''
+
 
 class QbitEnv(gym.Env):
     metadata = {'render.modes': ['human']}
 
     tol = 1e-9
 
-    def __init__(self, N_qbits, max_steps, max_cnots=2, fail_reward=-1):
+    def __init__(self, N_qbits, max_steps, max_cnots=2, fail_reward=-5):
         super(QbitEnv, self).__init__()
 
         self.N_qbits = N_qbits
         self.max_steps = max_steps
         self.max_cnots = max_cnots
-        self.fail_reward = fail_reward
+        self.fail_reward = fail_reward  # defines the reward of max steps is reached without reaching goal state
 
         self.actions = GateList(N_qbits)
         self.action_space = spaces.Discrete(len(self.actions))
