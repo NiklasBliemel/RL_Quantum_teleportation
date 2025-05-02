@@ -30,7 +30,7 @@ class Trainer:
             self.model = MaskablePPO.load(os.path.join("models", model_name, "best_model"), env=self.env)
             self.model.verbose = 0
             self.eval_callback.best_model_save_path = os.path.join("models", model_name)
-            self.eval_callback.log_path = os.path.join("logs", model_name)
+            self.eval_callback.log_path = f"models/{model_name}/log"
             print(f"{model_name} initialized!")
         else:
             print("Model does not exist")
@@ -45,12 +45,13 @@ class Trainer:
             if var == "n":
                 self.load_model(model_name)
                 return
+        else:
+            os.mkdir(f"models/{model_name}")
         self.reset_callback()
         self.model = MaskablePPO("MlpPolicy", self.env, learning_rate=learning_rate, ent_coef=ent_coef,
                                  policy_kwargs=policy_kwargs, verbose=verbose)
         self.eval_callback.best_model_save_path = os.path.join("models", model_name)
-        self.eval_callback.log_path = os.path.join("logs", model_name)
-        os.mkdir(f"models/{model_name}")
+        self.eval_callback.log_path = f"models/{model_name}/log"
         self.model.save(os.path.join("models", model_name, "best_model"))
         print(f"{model_name} initialized!")
 
