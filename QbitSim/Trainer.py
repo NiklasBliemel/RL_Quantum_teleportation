@@ -24,6 +24,9 @@ class Trainer:
             verbose=1
         )
 
+    def set_reward_threshold(self, reward_threshold):
+        self.eval_callback.callback_on_new_best.reward_threshold = reward_threshold
+
     def load_model(self, model_name):
         self.reset_callback()
         if model_name in os.listdir("models"):
@@ -80,18 +83,3 @@ class Trainer:
             times.append(time_ns() - start)
         total = sum(times) / 10
         print(f"Mean time: {total * 1e-6:.3f}ms")
-
-    def set_reward_threshold(self, reward_threshold):
-        self.callback_on_best = StopTrainingOnRewardThreshold(
-            reward_threshold=reward_threshold,
-            vebose=1
-        )
-        self.eval_callback = EvalCallback(
-            self.env,
-            n_eval_episodes=100,
-            eval_freq=1000,
-            best_model_save_path=os.path.join("models", model_name),
-            log_path=os.path.join("models", model_name + "_log"),
-            callback_on_new_best=self.callback_on_best,
-            verbose=1
-        )

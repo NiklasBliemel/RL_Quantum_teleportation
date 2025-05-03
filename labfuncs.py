@@ -19,7 +19,23 @@ def test(model_name):
     for _ in range(max_steps):
         # Retrieve current action mask
         action_masks = get_action_masks(env)
-        action, _states = test_model.predict(obs, action_masks=action_masks)
+        action, _states = test_model.predict(obs, deterministic=True, action_masks=action_masks)
+        obs, reward, terminated, truncated, info = env.step(action)
+        print(info)
+        if terminated:
+            print("Success!")
+            break
+    if not terminated:
+        print("Failure!")
+
+        
+def test_path(path):
+    test_model = MaskablePPO.load(path)
+    obs, _ = env.reset()
+    for _ in range(max_steps):
+        # Retrieve current action mask
+        action_masks = get_action_masks(env)
+        action, _states = test_model.predict(obs, deterministic=True, action_masks=action_masks)
         obs, reward, terminated, truncated, info = env.step(action)
         print(info)
         if terminated:
