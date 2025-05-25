@@ -64,11 +64,12 @@ class QbitEnv(gym.Env):
     def step(self, action):
         info = {"Step": self.cur_step}
 
-        if self.cur_step + 1 == self.max_steps:
+        if self.cur_step == self.max_steps:
+            score = self.case_check()
             info["M"] = None
             info["Action"] = "Step limit reached"
             info["Terminal"] = True
-            return self.state.flatten().numpy(), self.fail_reward, False, True, info
+            return self.state.flatten().numpy(), self.fail_reward + score, False, True, info
 
         self._update_invalid_actions(action)
 
@@ -95,6 +96,32 @@ class QbitEnv(gym.Env):
 
     def print_actions(self):
         print(self.actions)
+
+    def eval_circuit(self, circuit) -> int:
+        psi, random_state = new_q_bits(L=self.N_qbits)
+        for i in range(circuit.shape[0]):
+            psi, m = self.actions[circuit[i, 0]](psi, force_m=circuit[i, 1])
+            if infidality(psi, random_state) < QbitEnv.tol:
+                return 1
+        return 0
+
+    def case_check(self) -> int:
+        circuit = []
+        m_index = []
+        score: int = 0
+        for i, action in enumerate(self.state):
+            a = int(action % len(self.actions))
+            m = int(action // len(self.actions))
+            if m != 2:
+                m = 0
+                m_index.append(i)
+            circuit.append([a, m])
+        circuit = torch.tensor(circuit, dtype=torch.int32)
+        for i in range(2 ** len(m_index)):
+            for k in range(len(m_index)):
+                circuit[m_index[k]][1] = i % 2 ** (k + 1) // 2 ** k
+            score += self.eval_circuit(circuit)
+        return score
 
     def _terminal_check(self, inspect=False):
         infi = infidality(self.psi, self.random_state)

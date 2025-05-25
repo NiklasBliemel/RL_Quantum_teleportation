@@ -8,7 +8,7 @@ for name in os.listdir("models"):
     if best_val(name) > -10:
         models.append({"name": name, "data": np.load(f"models/{name}/log.npz")})
 
-points = ["x", "o", "v", "+"]
+points = ["x", "o", "v", "+", ".", ".", "."]
 
 for i, model in enumerate(models):
     if model["name"] != "mlp_2_(256_0.0003_0.0)":

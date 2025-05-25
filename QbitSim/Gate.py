@@ -9,7 +9,6 @@ target should be a list containing the index of targeted qbit(s)
 
 
 class Gate:
-
     gate_dic = {"X": pauliX, "Y": pauliY, "Z": pauliZ,
                 "H": hamada, "CX": controlX, "CZ": controlZ}
 
@@ -22,12 +21,12 @@ class Gate:
         self.gate = gate
         self.target = target
 
-    def __call__(self, psi):
+    def __call__(self, psi, force_m=None):
 
         if not self.measure:
             return contraction(psi, Gate.gate_dic[self.gate], self.target), None
         else:
-            out, m = measure(psi, [self.target[0]])
+            out, m = measure(psi, [self.target[0]], force_m)
             if len(self.target) == 1:
                 return out, m
             elif len(self.target) == 2:

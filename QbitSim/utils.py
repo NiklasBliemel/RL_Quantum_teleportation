@@ -74,9 +74,13 @@ def infidality(psi, rand_state):
 
 # chooses random 0 or 1 based on Qbit in dimension 'dim' and collapses wave function according to the result
 # also returns the measurement
-def measure(psi, dim):
-    probability = torch.sum(torch.abs(psi) ** 2, axis=[i for i in range(len(psi.shape)) if i != dim[0]])
-    state = random.choices([zero.clone().detach(), one.clone().detach()], probability.tolist())[0]
+def measure(psi, dim, m=None):
+    if m is None:
+        probability = torch.sum(torch.abs(psi) ** 2, axis=[i for i in range(len(psi.shape)) if i != dim[0]])
+        state = random.choices([zero.clone().detach(), one.clone().detach()], probability.tolist())[0]
+    else:
+        state = torch.zeros(2, dtype=dtype)
+        state[m] = 1
     out = contraction(psi, torch.outer(state, state), dim)
     out /= torch.norm(out)
     return out, torch.real(state[1]).int()

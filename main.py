@@ -2,12 +2,13 @@ from typing import List
 
 import numpy as np
 
+import torch
+
 import QbitSim as qsim
 
 from labfuncs import best_val
 
 if __name__ == '__main__':
-
     # Environment settings
     N_qbits = 3
     max_steps = 12
